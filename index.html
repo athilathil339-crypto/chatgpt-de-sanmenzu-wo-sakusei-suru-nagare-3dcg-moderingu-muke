@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChatGPTで三面図を作成する流れ｜3DCGモデリング向け</title>
+  <style>
+    :root{
+      --bg:#07182f;
+      --bg2:#0c2c55;
+      --white:#f7fbff;
+      --muted:#c6d6e9;
+      --accent:#ff9f1c;
+      --accent2:#34d1bf;
+      --line:rgba(255,255,255,.22);
+      --shadow:0 28px 80px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:#050b14;color:var(--white);font-family:"Yu Gothic","Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,system-ui,sans-serif;overflow:hidden}
+    body{display:grid;place-items:center}
+    #deck{width:1920px;height:1080px;position:relative;transform-origin:center center;background:linear-gradient(135deg,var(--bg),var(--bg2));box-shadow:var(--shadow);overflow:hidden}
+    .slide{position:absolute;inset:0;padding:76px 96px;display:none;overflow:hidden}
+    .slide.active{display:block}
+    .slide::before{content:"";position:absolute;width:720px;height:720px;border-radius:50%;right:-240px;top:-260px;background:radial-gradient(circle,rgba(52,209,191,.26),rgba(52,209,191,0) 67%)}
+    .slide::after{content:"";position:absolute;width:560px;height:560px;border-radius:50%;left:-220px;bottom:-270px;background:radial-gradient(circle,rgba(255,159,28,.22),rgba(255,159,28,0) 67%)}
+    .content{position:relative;z-index:2;height:100%;display:flex;flex-direction:column}
+    .eyebrow{font-size:30px;letter-spacing:.08em;color:var(--accent);font-weight:800;margin-bottom:18px}
+    h1{font-size:86px;line-height:1.08;margin:0 0 32px;font-weight:900;letter-spacing:-.035em}
+    h2{font-size:64px;line-height:1.12;margin:0 0 42px;font-weight:900;letter-spacing:-.03em}
+    h3{font-size:38px;margin:0 0 18px;font-weight:900;color:#fff}
+    p{font-size:34px;line-height:1.55;margin:0;color:var(--muted);font-weight:650}
+    .lead{font-size:42px;line-height:1.45;max-width:1320px;color:#e8f2ff}
+    .grid2{display:grid;grid-template-columns:1.05fr .95fr;gap:58px;align-items:center;flex:1}
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:34px;align-items:stretch;flex:1}
+    .card{border:1px solid var(--line);background:rgba(255,255,255,.08);border-radius:34px;padding:36px;box-shadow:0 16px 48px rgba(0,0,0,.18);backdrop-filter:blur(10px)}
+    .bigcard{padding:48px;border-radius:42px}
+    .num{font-size:130px;line-height:.85;font-weight:1000;color:var(--accent);letter-spacing:-.08em}
+    .step{display:grid;grid-template-columns:210px 1fr;gap:34px;align-items:start;margin-top:24px}
+    ul{margin:0;padding:0;list-style:none;display:grid;gap:20px}
+    li{font-size:38px;line-height:1.35;font-weight:800;color:#f4f9ff;display:flex;gap:18px;align-items:flex-start}
+    li::before{content:"✓";color:var(--accent2);font-weight:1000;flex:0 0 auto}
+    .small li{font-size:31px;line-height:1.32}
+    .bad li::before{content:"×";color:#ff6b6b}
+    .pillrow{display:flex;gap:18px;flex-wrap:wrap;margin-top:36px}
+    .pill{font-size:28px;font-weight:900;border:1px solid var(--line);border-radius:999px;padding:14px 24px;background:rgba(255,255,255,.09);color:#fff}
+    .diagram{height:690px;display:grid;grid-template-columns:1fr;gap:0;border-radius:22px;overflow:hidden;border:3px solid #fff;background:#fff;color:#111;box-shadow:0 24px 80px rgba(0,0,0,.28)}
+    .viewbox{height:230px;border-bottom:3px solid #000;display:grid;place-items:center;position:relative;background:#fff}
+    .viewbox:last-child{border-bottom:0}
+    .viewbox span{position:absolute;left:24px;top:18px;font-size:26px;font-weight:900;color:#111;opacity:.72}
+    .object{width:320px;height:120px;border-radius:60px;background:linear-gradient(135deg,#9aa8b8,#d9e4ee);border:8px solid #2d3d4d;position:relative}
+    .object::before,.object::after{content:"";position:absolute;top:33px;width:54px;height:54px;border-radius:50%;background:#273747}
+    .object::before{left:45px}.object::after{right:45px}
+    .object.side{width:410px;height:110px;border-radius:34px}.object.top{width:340px;height:190px;border-radius:46px}.object.front{width:250px;height:190px;border-radius:54px}
+    .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;margin-top:28px}
+    .flow .card{min-height:260px;display:flex;flex-direction:column;justify-content:space-between}
+    .flow .label{font-size:26px;color:var(--accent);font-weight:1000}
+    .flow .title{font-size:37px;line-height:1.15;font-weight:1000;color:#fff}
+    .prompt{background:#07111f;border:1px solid rgba(255,255,255,.25);border-radius:28px;padding:32px;font-family:"Consolas","Menlo",monospace;font-size:24px;line-height:1.48;color:#e8f2ff;white-space:pre-wrap;max-height:690px;overflow:hidden}
+    .warning{border-left:14px solid var(--accent);padding-left:34px;margin-top:26px}
+    .tools{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;margin-top:34px}
+    .tool{height:190px;border-radius:32px;border:1px solid var(--line);background:rgba(255,255,255,.09);display:grid;place-items:center;text-align:center;font-size:32px;font-weight:1000;color:#fff;padding:18px}
+    .center{display:grid;place-items:center;text-align:center;height:100%}
+    .bigquote{font-size:68px;line-height:1.22;font-weight:1000;max-width:1450px}
+    .accent{color:var(--accent)}
+    .footer{position:absolute;left:96px;right:96px;bottom:34px;z-index:4;display:flex;justify-content:space-between;align-items:center;color:rgba(255,255,255,.7);font-size:22px;font-weight:800}
+    .progress{height:6px;background:rgba(255,255,255,.18);border-radius:999px;width:520px;overflow:hidden}.bar{height:100%;width:0;background:var(--accent);border-radius:999px}
+    .controls{position:absolute;right:36px;bottom:32px;z-index:10;display:flex;gap:10px}.btn{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;border-radius:999px;width:54px;height:54px;font-size:28px;font-weight:900;cursor:pointer}.btn:hover{background:rgba(255,255,255,.22)}
+    .layout-note{position:absolute;right:70px;top:56px;font-size:24px;font-weight:900;color:rgba(255,255,255,.55)}
+    @media print{body{display:block;overflow:visible;background:white}#deck{transform:none!important;box-shadow:none}.slide{position:relative;display:block;page-break-after:always}.controls,.footer{display:none}}
+  
+/* Prompt display window: scroll inside the prompt box */
+.prompt-box,
+.prompt,
+.code-box,
+pre {
+  max-height: 58vh !important;
+  overflow-y: scroll !important;
+  overflow-x: auto !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  padding-right: 22px !important;
+  scrollbar-gutter: stable !important;
+}
+
+.prompt-box::-webkit-scrollbar,
+.prompt::-webkit-scrollbar,
+.code-box::-webkit-scrollbar,
+pre::-webkit-scrollbar {
+  width: 16px;
+}
+
+.prompt-box::-webkit-scrollbar-thumb,
+.prompt::-webkit-scrollbar-thumb,
+.code-box::-webkit-scrollbar-thumb,
+pre::-webkit-scrollbar-thumb {
+  background: #666;
+  border-radius: 8px;
+}
+
+.prompt-box::-webkit-scrollbar-track,
+.prompt::-webkit-scrollbar-track,
+.code-box::-webkit-scrollbar-track,
+pre::-webkit-scrollbar-track {
+  background: #ddd;
+}
+
+
+/* Slide 2 robot blueprint illustration - horizontal layout */
+.robot-blueprint {
+  width: min(900px, 100%);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: none;
+  gap: 14px;
+  align-items: center;
+}
+.robot-panel {
+  position: relative;
+  background: #f8fbff;
+  border: 1px solid #111;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+  max-height: 280px;
+}
+.robot-panel svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.robot-panel .panel-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  font-weight: 900;
+  font-size: 16px;
+  line-height: 1.05;
+  color: #1f3f75;
+  background: rgba(255,255,255,.82);
+  padding: 5px 7px;
+  border-radius: 7px;
+}
+.robot-panel .panel-label small {
+  font-size: 11px;
+  color: #444;
+}
+.bp-border {
+  fill: none;
+  stroke: #111;
+  stroke-width: 1;
+}
+.part {
+  fill: #eaf3ff;
+  stroke: #1d3557;
+  stroke-width: 4;
+}
+.detail {
+  fill: #fff;
+  stroke: #1d3557;
+  stroke-width: 4;
+}
+.detail-line,
+.axis {
+  fill: none;
+  stroke: #6c7a89;
+  stroke-width: 2;
+  stroke-dasharray: 8 7;
+}
+
+
+.slide2-layout {
+  grid-template-columns: 0.8fr 1.4fr !important;
+  gap: 38px !important;
+  align-items: center !important;
+}
+.slide2-layout .step {
+  font-size: 0.92em;
+}
+
+</style>
+</head>
+<body>
+  <main id="deck" aria-label="ChatGPTで三面図を作成する流れ">
+    <section class="slide active">
+      <div class="content center">
+        <div class="eyebrow">3DCG MODELING REFERENCE</div>
+        <h1>ChatGPTで<br>三面図を作成する流れ</h1>
+        <p class="lead">写真から、3DCGモデリング用の<br>正面図・側面図・上面図を作る</p>
+        <div class="pillrow" style="justify-content:center"><span class="pill">横画面フルHD</span><span class="pill">50インチ表示向け</span><span class="pill">大きく見やすい</span></div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content">
+        <div class="eyebrow">GOAL</div>
+        <h2>完成イメージ</h2>
+        <div class="grid2 slide2-layout">
+          <div>
+            <p class="lead">1枚の写真をもとに、<br><span class="accent">三面図</span>を作成します。</p>
+            <div class="step"><div class="num">1</div><ul><li>正面図 1024×1024</li><li>側面図 1024×1024</li><li>上面図 1024×1024</li><li>全体サイズ 1024×3072</li></ul></div>
+          </div>
+          
+<div class="robot-blueprint" aria-label="ロボット三面図">
+  <div class="robot-panel">
+    <div class="panel-label">FRONT<br><small>1024×1024</small></div>
+    <svg viewBox="0 0 300 300" role="img">
+      <rect class="bp-border" x="1" y="1" width="298" height="298"/>
+      <line class="axis" x1="150" y1="18" x2="150" y2="282"/>
+      <rect class="part" x="112" y="38" width="76" height="56" rx="10"/>
+      <circle class="detail" cx="132" cy="62" r="5"/>
+      <circle class="detail" cx="168" cy="62" r="5"/>
+      <rect class="part" x="92" y="108" width="116" height="88" rx="12"/>
+      <circle class="detail" cx="150" cy="150" r="18"/>
+      <rect class="part" x="55" y="116" width="28" height="80" rx="10"/>
+      <rect class="part" x="217" y="116" width="28" height="80" rx="10"/>
+      <rect class="part" x="108" y="206" width="28" height="62" rx="8"/>
+      <rect class="part" x="164" y="206" width="28" height="62" rx="8"/>
+      <rect class="part" x="94" y="270" width="48" height="14" rx="5"/>
+      <rect class="part" x="158" y="270" width="48" height="14" rx="5"/>
+    </svg>
+  </div>
+  <div class="robot-panel">
+    <div class="panel-label">SIDE<br><small>1024×1024</small></div>
+    <svg viewBox="0 0 300 300" role="img">
+      <rect class="bp-border" x="1" y="1" width="298" height="298"/>
+      <line class="axis" x1="150" y1="18" x2="150" y2="282"/>
+      <rect class="part" x="118" y="38" width="62" height="56" rx="10"/>
+      <rect class="part" x="103" y="108" width="82" height="88" rx="12"/>
+      <circle class="detail" cx="185" cy="145" r="10"/>
+      <rect class="part" x="74" y="118" width="24" height="78" rx="10"/>
+      <rect class="part" x="124" y="206" width="24" height="62" rx="8"/>
+      <rect class="part" x="151" y="206" width="24" height="62" rx="8"/>
+      <rect class="part" x="110" y="270" width="70" height="14" rx="5"/>
+      <path class="detail-line" d="M117 55 L101 62 L117 69"/>
+    </svg>
+  </div>
+  <div class="robot-panel">
+    <div class="panel-label">TOP<br><small>1024×1024</small></div>
+    <svg viewBox="0 0 300 300" role="img">
+      <rect class="bp-border" x="1" y="1" width="298" height="298"/>
+      <line class="axis" x1="18" y1="150" x2="282" y2="150"/>
+      <line class="axis" x1="150" y1="18" x2="150" y2="282"/>
+      <rect class="part" x="106" y="44" width="88" height="58" rx="12"/>
+      <rect class="part" x="84" y="116" width="132" height="82" rx="14"/>
+      <circle class="detail" cx="150" cy="157" r="18"/>
+      <rect class="part" x="38" y="122" width="34" height="74" rx="10"/>
+      <rect class="part" x="228" y="122" width="34" height="74" rx="10"/>
+      <rect class="part" x="103" y="214" width="94" height="34" rx="9"/>
+    </svg>
+  </div>
+</div>
+
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content">
+        <div class="eyebrow">STEP 01</div>
+        <h2>元画像を用意する</h2>
+        <div class="grid2">
+          <div class="card bigcard">
+            <h3>おすすめの画像</h3>
+            <ul><li>オブジェクト全体が見える</li><li>背景がシンプル</li><li>解像度が高い</li><li>形の輪郭が分かりやすい</li></ul>
+          </div>
+          <div class="card bigcard">
+            <h3>向いている題材</h3>
+            <ul><li>商品写真・小物</li><li>ロボ・メカ</li><li>車・乗り物</li><li>家具・ガジェット</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content">
+        <div class="eyebrow">STEP 02</div>
+        <h2>ChatGPTへ画像をアップロード</h2>
+        <div class="grid2">
+          <div>
+            <p class="lead">ChatGPTの画像機能に、<br>三面図にしたい写真を入れます。</p>
+            <div class="warning"><p>斜め写真1枚だけの場合、見えない面はAIが推測します。正面・横・斜めの複数画像があると精度が上がります。</p></div>
+          </div>
+          <div class="card bigcard">
+            <ul><li>画像を添付</li><li>用途を伝える</li><li>出力サイズを指定</li><li>ビューの順番を指定</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content">
+        <div class="eyebrow">STEP 03</div>
+        <h2>三面図生成プロンプトを入力</h2>
+        <div class="prompt">添付画像のオブジェクトを解析し、
+3DCGモデリング用イメージプレーンとして使用可能な
+三面図画像を生成してください。
+
+出力画像サイズは必ず：横 1024px、縦 3072px。
+
+画像は縦に3分割し、以下の順番で配置してください。
+上段：正面図 front view
+中段：側面図 side view
+下段：上面図 top view
+
+各エリアのサイズは必ず 1024px × 1024px。
+各1024x1024エリアの外周を、1ピクセル幅の黒い線で囲んでください。
+
+各ビューは同じオブジェクトを、同じスケール・同じ比率・同じ中心位置で配置してください。
+All views must describe the exact same object with identical proportions.
+
+正投影 orthographic projection で生成してください。パースは除去してください。
+元画像の材質・色・ディテールを維持してください。
+白背景。文字・ラベル・寸法線は不要。</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content">
+        <div class="eyebrow">STEP 04</div>
+        <h2>生成画像を保存する</h2>
+        <div class="grid3">
+          <div class="card"><div class="num">PNG</div><h3>PNG保存</h3><p>圧縮劣化を避けるため、PNG形式がおすすめ。</p></div>
+          <div class="card"><div class="num">1:3</div><h3>縦長画像</h3><p>1024×3072のまま保存。後で3分割しやすい。</p></div>
+          <div class="card"><div class="num">3</div><h3>3ビュー確認</h3><p>正面・側面・上面のスケールが揃っているか確認。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content">
+        <div class="eyebrow">STEP 05</div>
+        <h2>3DCGモデリングツールへ読み込む</h2>
+        <p class="lead">作成した三面図を、イメージプレーンやリファレンス画像として配置します。</p>
+        <div class="tools">
+          <div class="tool">Blender</div><div class="tool">Maya</div><div class="tool">3ds Max</div><div class="tool">Cinema 4D</div>
+        </div>
+        <div class="grid3" style="margin-top:34px">
+          <div class="card"><h3>正面図</h3><p>Frontビューに配置</p></div>
+          <div class="card"><h3>側面図</h3><p>Sideビューに配置</p></div>
+          <div class="card"><h3>上面図</h3><p>Topビューに配置</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content">
+        <div class="eyebrow">STEP 06</div>
+        <h2>スケールと中心を確認する</h2>
+        <div class="grid2">
+          <div class="card bigcard">
+            <h3>確認ポイント</h3>
+            <ul><li>高さが同じか</li><li>中心軸が揃っているか</li><li>横幅・奥行きが不自然でないか</li><li>ビューごとに別物になっていないか</li></ul>
+          </div>
+          <div class="card bigcard">
+            <h3>プロンプトで効く言葉</h3>
+            <ul><li>same scale across all views</li><li>consistent proportions</li><li>center aligned</li><li>orthographic projection</li></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content">
+        <div class="eyebrow">CAUTION</div>
+        <h2>AI三面図の注意点</h2>
+        <div class="grid2">
+          <div class="card bigcard">
+            <ul class="bad"><li>完全なCAD図面ではない</li><li>見えない面は推測になる</li><li>細部がビューごとに変わることがある</li><li>一度で完璧に揃わない場合がある</li></ul>
+          </div>
+          <div>
+            <p class="lead">だから、モデリング前に<br><span class="accent">形状・比率・中心軸</span>を必ずチェックします。</p>
+            <div class="pillrow"><span class="pill">修正プロンプト</span><span class="pill">再生成</span><span class="pill">手動調整</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content">
+        <div class="eyebrow">WORKFLOW</div>
+        <h2>全体の流れ</h2>
+        <div class="flow">
+          <div class="card"><div class="label">01</div><div class="title">元画像を<br>用意</div></div>
+          <div class="card"><div class="label">02</div><div class="title">ChatGPTへ<br>アップロード</div></div>
+          <div class="card"><div class="label">03</div><div class="title">プロンプトを<br>入力</div></div>
+          <div class="card"><div class="label">04</div><div class="title">PNGで<br>保存</div></div>
+          <div class="card"><div class="label">05</div><div class="title">3DCGツールへ<br>読み込み</div></div>
+          <div class="card"><div class="label">06</div><div class="title">スケールを<br>確認</div></div>
+          <div class="card"><div class="label">07</div><div class="title">必要なら<br>再生成</div></div>
+          <div class="card"><div class="label">08</div><div class="title">モデリング<br>開始</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div class="content center">
+        <div class="eyebrow">KEY POINT</div>
+        <div class="bigquote">三面図で一番大事なのは<br><span class="accent">「同じ物を、同じスケールで、別角度から見る」</span>こと。</div>
+        <div class="pillrow" style="justify-content:center;margin-top:56px"><span class="pill">orthographic projection</span><span class="pill">same scale</span><span class="pill">consistent proportions</span></div>
+      </div>
+    </section>
+
+    <div class="footer"><span id="pageNum">1 / 11</span><div class="progress"><div class="bar" id="bar"></div></div><span>← → キー / 画面ボタンで操作</span></div>
+    <div class="controls"><button class="btn" id="prev" aria-label="前へ">‹</button><button class="btn" id="next" aria-label="次へ">›</button></div>
+  </main>
+  <script>
+    const deck=document.getElementById('deck');
+    const slides=[...document.querySelectorAll('.slide')];
+    const pageNum=document.getElementById('pageNum');
+    const bar=document.getElementById('bar');
+    let index=0;
+    function scaleDeck(){const s=Math.min(window.innerWidth/1920,window.innerHeight/1080);deck.style.transform=`scale(${s})`;}
+    function show(i){index=Math.max(0,Math.min(slides.length-1,i));slides.forEach((el,n)=>el.classList.toggle('active',n===index));pageNum.textContent=`${index+1} / ${slides.length}`;bar.style.width=`${((index+1)/slides.length)*100}%`;}
+    document.getElementById('prev').onclick=()=>show(index-1);
+    document.getElementById('next').onclick=()=>show(index+1);
+    window.addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' '].includes(e.key)){e.preventDefault();show(index+1)} if(['ArrowLeft','PageUp','Backspace'].includes(e.key)){e.preventDefault();show(index-1)} if(e.key.toLowerCase()==='f'){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}});
+    window.addEventListener('resize',scaleDeck);
+    scaleDeck();show(0);
+  </script>
+</body>
+</html>
